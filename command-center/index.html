@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#5E1F2E">
+<title>Command Center | Ensambladas</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --wine:#5E1F2E; --wine-deep:#2B0F16; --cream:#F8F1E5; --gold:#C9A24B;
+  --espresso:#2E2118; --muted:#8a7a6d; --line:#e7dccb; --card:#fffdf8;
+  --green:#4a7c59; --red:#a33b3b;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+body{margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  background:var(--cream); color:var(--espresso); padding-bottom:90px;}
+.hidden{display:none !important}
+
+/* ---------- auth ---------- */
+#auth{max-width:380px; margin:0 auto; padding:60px 24px 24px; text-align:center}
+#auth h1{font-size:1.9rem; color:var(--wine); margin:0 0 6px; letter-spacing:-.02em}
+#auth p.sub{color:var(--muted); font-size:.95rem; margin:0 0 28px}
+#auth input{width:100%; padding:14px 16px; margin:0 0 12px; border:1.5px solid var(--line);
+  border-radius:12px; font-size:1rem; background:#fff; font-family:inherit}
+#auth input:focus{outline:none; border-color:var(--wine)}
+.btn{display:block; width:100%; padding:15px; border:none; border-radius:12px; font-size:1rem;
+  font-weight:700; cursor:pointer; font-family:inherit}
+.btn-wine{background:var(--wine); color:#fff}
+.btn-wine:active{transform:scale(.98)}
+.btn-ghost{background:transparent; color:var(--wine); margin-top:10px; font-weight:600}
+#authErr{color:var(--red); font-size:.85rem; min-height:20px; margin:8px 0}
+
+/* ---------- header ---------- */
+header.top{position:sticky; top:0; z-index:20; background:var(--wine-deep); color:var(--cream);
+  padding:14px 18px; display:flex; align-items:center; justify-content:space-between}
+header.top .t{font-weight:800; letter-spacing:.06em; font-size:.82rem; text-transform:uppercase}
+header.top .t span{color:var(--gold)}
+#logoutBtn{background:none; border:1px solid rgba(248,241,229,.35); color:var(--cream);
+  border-radius:8px; padding:7px 12px; font-size:.8rem; cursor:pointer; font-family:inherit}
+
+/* ---------- tabs ---------- */
+nav.tabs{position:fixed; bottom:0; left:0; right:0; z-index:20; background:#fffdf8;
+  border-top:1px solid var(--line); display:flex; padding:8px 8px calc(8px + env(safe-area-inset-bottom))}
+nav.tabs button{flex:1; background:none; border:none; padding:10px 4px; font-family:inherit;
+  color:var(--muted); font-size:.78rem; font-weight:700; cursor:pointer; border-radius:10px}
+nav.tabs button.active{color:var(--wine); background:#f3e9d8}
+
+/* ---------- board ---------- */
+#boardWrap{max-width:1200px; margin:0 auto; padding:16px 14px}
+.cols{display:grid; grid-template-columns:repeat(5,minmax(240px,1fr)); gap:12px; align-items:start}
+@media(max-width:900px){ .cols{display:flex; overflow-x:auto; scroll-snap-type:x mandatory; padding-bottom:8px}
+  .col{min-width:78vw; scroll-snap-align:start} }
+.col{background:#f1e7d3; border-radius:14px; padding:10px; min-height:120px}
+.col h3{margin:2px 4px 10px; font-size:.78rem; text-transform:uppercase; letter-spacing:.08em;
+  color:var(--wine); display:flex; justify-content:space-between; align-items:center}
+.col h3 .n{background:var(--wine); color:#fff; border-radius:99px; font-size:.72rem;
+  padding:2px 9px; letter-spacing:0}
+.card{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px;
+  margin-bottom:10px; cursor:pointer; box-shadow:0 1px 3px rgba(46,33,24,.06)}
+.card:active{transform:scale(.99)}
+.card .ct{font-weight:700; font-size:.92rem; line-height:1.35; margin:0 0 8px}
+.pills{display:flex; flex-wrap:wrap; gap:6px}
+.pill{font-size:.68rem; font-weight:700; padding:3px 9px; border-radius:99px; letter-spacing:.03em}
+.pill.lang{background:#e9dff5; color:#5b4a86}
+.pill.pillar{background:#f3e9d8; color:var(--wine)}
+.card .mv{display:flex; justify-content:space-between; margin-top:10px; padding-top:8px;
+  border-top:1px solid var(--line)}
+.card .mv button{background:none; border:none; color:var(--wine); font-size:1.05rem;
+  cursor:pointer; padding:4px 10px; font-family:inherit}
+#addCardBtn{position:fixed; right:18px; bottom:calc(86px + env(safe-area-inset-bottom)); z-index:25;
+  width:58px; height:58px; border-radius:50%; background:var(--wine); color:#fff; border:none;
+  font-size:1.7rem; cursor:pointer; box-shadow:0 4px 14px rgba(94,31,46,.4); font-family:inherit}
+
+/* ---------- modal ---------- */
+#modal{position:fixed; inset:0; z-index:50; background:rgba(43,15,22,.55); display:flex;
+  align-items:flex-end; justify-content:center}
+@media(min-width:700px){ #modal{align-items:center; padding:30px} }
+.sheet{background:var(--cream); width:100%; max-width:620px; max-height:92vh; overflow-y:auto;
+  border-radius:20px 20px 0 0; padding:22px 20px calc(24px + env(safe-area-inset-bottom))}
+@media(min-width:700px){ .sheet{border-radius:20px} }
+.sheet h2{margin:0 0 4px; font-size:1.25rem; color:var(--wine); letter-spacing:-.01em}
+.fld{margin:14px 0}
+.fld label{display:block; font-size:.72rem; font-weight:700; text-transform:uppercase;
+  letter-spacing:.07em; color:var(--muted); margin-bottom:6px}
+.fld input[type=text], .fld textarea, .fld select{width:100%; padding:12px 14px; font-size:.95rem;
+  border:1.5px solid var(--line); border-radius:10px; background:#fff; font-family:inherit; color:var(--espresso)}
+.fld textarea{min-height:120px; line-height:1.55; resize:vertical}
+.fld input:focus, .fld textarea:focus, .fld select:focus{outline:none; border-color:var(--wine)}
+.seg{display:flex; flex-wrap:wrap; gap:8px}
+.seg button{flex:1 1 28%; padding:10px 6px; border:1.5px solid var(--line); background:#fff;
+  border-radius:10px; font-size:.8rem; font-weight:700; cursor:pointer; color:var(--muted); font-family:inherit}
+.seg button.on{border-color:var(--wine); color:var(--wine); background:#f7ecec}
+.metrics{display:grid; grid-template-columns:repeat(4,1fr); gap:8px}
+.metrics input{width:100%; padding:10px 6px; text-align:center; border:1.5px solid var(--line);
+  border-radius:10px; font-size:.95rem; font-family:inherit}
+.rowbtns{display:flex; gap:10px; margin-top:18px}
+.rowbtns .btn{margin:0}
+.btn-del{background:#fbe9e9; color:var(--red)}
+#closeModal{background:none; border:none; font-size:1.4rem; float:right; cursor:pointer; color:var(--muted)}
+
+/* ---------- huddle ---------- */
+#huddleWrap{max-width:620px; margin:0 auto; padding:20px 18px}
+.hcard{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:20px; margin-bottom:14px}
+.hcard .eyebrow{font-size:.7rem; font-weight:800; text-transform:uppercase; letter-spacing:.14em;
+  color:var(--gold); margin-bottom:8px}
+.hcard h2{margin:0 0 6px; color:var(--wine); font-size:1.35rem; letter-spacing:-.01em}
+.hcard .date{color:var(--muted); font-size:.85rem; margin-bottom:4px}
+.streak{display:inline-block; background:var(--wine); color:#fff; font-weight:800; border-radius:99px;
+  padding:6px 16px; font-size:.85rem; margin-top:10px}
+.empty{text-align:center; color:var(--muted); padding:40px 20px; font-size:.95rem; line-height:1.6}
+.toast{position:fixed; left:50%; transform:translateX(-50%); bottom:calc(96px + env(safe-area-inset-bottom));
+  background:var(--wine-deep); color:var(--cream); padding:12px 22px; border-radius:99px; font-size:.88rem;
+  z-index:99; opacity:0; transition:opacity .25s; pointer-events:none; max-width:90vw; text-align:center}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<!-- AUTH -->
+<div id="auth">
+  <h1>Ensambladas</h1>
+  <p class="sub">Command Center · private board</p>
+  <input type="email" id="email" placeholder="Email" autocomplete="email">
+  <input type="password" id="password" placeholder="Password" autocomplete="current-password">
+  <div id="authErr"></div>
+  <button class="btn btn-wine" id="authGo">Sign in</button>
+  <button class="btn-ghost" id="authToggle">New here? Create account</button>
+</div>
+
+<!-- APP -->
+<div id="app" class="hidden">
+  <header class="top">
+    <div class="t">First ministry: <span>home</span></div>
+    <button id="logoutBtn">Log out</button>
+  </header>
+
+  <!-- BOARD -->
+  <div id="boardWrap">
+    <div class="cols" id="cols"></div>
+  </div>
+
+  <!-- HUDDLE -->
+  <div id="huddleWrap" class="hidden">
+    <div class="hcard">
+      <div class="eyebrow">5-minute morning huddle</div>
+      <h2 id="hDate"></h2>
+      <div class="fld"><label>Verse</label><input type="text" id="hVerse" placeholder="Today's verse"></div>
+      <div class="fld"><label>Prayer focus</label><input type="text" id="hPrayer" placeholder="What are we praying over?"></div>
+      <div class="fld"><label>One stewardship intention</label><input type="text" id="hIntention" placeholder="One faithful step today"></div>
+      <div class="fld"><label>Alec's space</label><input type="text" id="hAlec" placeholder="For Alec"></div>
+      <div class="fld"><label>Streak (days)</label><input type="text" id="hStreak" inputmode="numeric" placeholder="0"></div>
+      <button class="btn btn-wine" id="hSave">Save huddle</button>
+      <div style="text-align:center"><span class="streak" id="hStreakView">🔥 0 day streak</span></div>
+    </div>
+  </div>
+
+  <button id="addCardBtn" title="Add card">+</button>
+  <nav class="tabs">
+    <button id="tabToday">☀️ Today</button>
+    <button id="tabBoard" class="active">🗂 Board</button>
+  </nav>
+</div>
+
+<!-- CARD MODAL -->
+<div id="modal" class="hidden">
+  <div class="sheet">
+    <button id="closeModal">✕</button>
+    <h2 id="mTitle_head">Card</h2>
+    <div class="fld"><label>Title</label><input type="text" id="mTitle"></div>
+    <div class="fld"><label>Column</label><div class="seg" id="mStatus"></div></div>
+    <div class="fld"><label>Language</label><div class="seg" id="mLang"></div></div>
+    <div class="fld"><label>Pillar</label><input type="text" id="mPillar"></div>
+    <div class="fld"><label>Summary</label><input type="text" id="mSummary"></div>
+    <div class="fld"><label>Scripture</label><input type="text" id="mScripture"></div>
+    <div class="fld"><label>Notes / script</label><textarea id="mNotes"></textarea></div>
+    <div class="fld"><label>Metrics</label>
+      <div class="metrics">
+        <input id="mViews" inputmode="numeric" placeholder="Views">
+        <input id="mLikes" inputmode="numeric" placeholder="Likes">
+        <input id="mShares" inputmode="numeric" placeholder="Shares">
+        <input id="mFollowers" inputmode="numeric" placeholder="Followers">
+      </div>
+    </div>
+    <div class="rowbtns">
+      <button class="btn btn-wine" id="mSave">Save</button>
+      <button class="btn btn-del" id="mDelete">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = "https://nssdfhkzjoanbzgpilvz.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zc2RmaGt6am9hbmJ6Z3BpbHZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMzNDgyMDgsImV4cCI6MjA5ODkyNDIwOH0.noQB7SiltD400wftYPv309n5AX8sf5-Kp1ycNJS-0B8";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+const COLS = [
+  {k:"ideas", label:"Ideas"},
+  {k:"to_film", label:"To Film"},
+  {k:"editing", label:"Editing"},
+  {k:"ready", label:"Ready"},
+  {k:"posted", label:"Posted"},
+];
+const LANGS = ["EN","ES","BOTH"];
+let cards = [];
+let editingId = null;
+let isSignup = false;
+
+const $ = id => document.getElementById(id);
+function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("show");
+  clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"),2200); }
+function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+  .replace(/"/g,"&quot;"); }
+
+/* ---------- auth ---------- */
+$("authToggle").onclick = () => {
+  isSignup = !isSignup;
+  $("authGo").textContent = isSignup ? "Create account" : "Sign in";
+  $("authToggle").textContent = isSignup ? "Have an account? Sign in" : "New here? Create account";
+  $("authErr").textContent = "";
+};
+$("authGo").onclick = async () => {
+  const email = $("email").value.trim(), password = $("password").value;
+  $("authErr").textContent = "";
+  if(!email || !password){ $("authErr").textContent = "Enter your email and password."; return; }
+  $("authGo").disabled = true;
+  try{
+    const res = isSignup
+      ? await sb.auth.signUp({email, password})
+      : await sb.auth.signInWithPassword({email, password});
+    if(res.error) throw res.error;
+    if(isSignup && res.data.session === null){
+      toast("Account created! Check your email to confirm, then sign in.");
+      isSignup = false; $("authGo").textContent = "Sign in";
+      $("authToggle").textContent = "New here? Create account";
+    } else { enter(); }
+  }catch(e){ $("authErr").textContent = e.message || "Something went wrong."; }
+  $("authGo").disabled = false;
+};
+$("logoutBtn").onclick = async () => { await sb.auth.signOut(); location.reload(); };
+
+async function enter(){
+  $("auth").classList.add("hidden");
+  $("app").classList.remove("hidden");
+  await loadBoard();
+  await loadHuddle();
+}
+
+/* ---------- board ---------- */
+async function loadBoard(){
+  const {data, error} = await sb.from("cc_cards")
+    .select("*").order("position",{ascending:true}).order("updated_at",{ascending:false});
+  if(error){ toast("Could not load board: "+error.message); return; }
+  cards = data || [];
+  renderBoard();
+}
+function renderBoard(){
+  const wrap = $("cols"); wrap.innerHTML = "";
+  COLS.forEach(c => {
+    const list = cards.filter(x => x.status === c.k);
+    const col = document.createElement("div"); col.className = "col";
+    col.innerHTML = `<h3>${c.label}<span class="n">${list.length}</span></h3>`;
+    list.forEach(card => {
+      const d = document.createElement("div"); d.className = "card";
+      d.innerHTML = `<p class="ct">${esc(card.title)}</p>
+        <div class="pills"><span class="pill lang">${esc(card.language)}</span>
+        <span class="pill pillar">${esc(card.pillar)}</span></div>
+        <div class="mv"><button data-mv="-1" data-id="${card.id}">←</button>
+        <button data-mv="1" data-id="${card.id}">→</button></div>`;
+      d.onclick = e => {
+        const mv = e.target.closest("[data-mv]");
+        if(mv){ e.stopPropagation(); quickMove(card, parseInt(mv.dataset.mv)); return; }
+        openModal(card);
+      };
+      col.appendChild(d);
+    });
+    wrap.appendChild(col);
+  });
+  if(!cards.length){
+    wrap.innerHTML = `<div class="empty">Your board is empty.<br>Tap + to add your first card.</div>`;
+  }
+}
+async function quickMove(card, dir){
+  const i = COLS.findIndex(c => c.k === card.status);
+  const ni = i + dir;
+  if(ni < 0 || ni >= COLS.length) return;
+  const {error} = await sb.from("cc_cards").update({status: COLS[ni].k, updated_at: new Date().toISOString()}).eq("id", card.id);
+  if(error) toast(error.message); else loadBoard();
+}
+
+/* ---------- modal ---------- */
+function seg(el, options, current){
+  el.innerHTML = "";
+  options.forEach(o => {
+    const b = document.createElement("button");
+    b.textContent = o.label || o; b.dataset.v = o.k || o;
+    if((o.k||o) === current) b.classList.add("on");
+    b.onclick = () => { el.querySelectorAll("button").forEach(x=>x.classList.remove("on")); b.classList.add("on"); };
+    el.appendChild(b);
+  });
+}
+function segVal(el){ const b = el.querySelector("button.on"); return b ? b.dataset.v : null; }
+function openModal(card){
+  editingId = card ? card.id : null;
+  $("mTitle_head").textContent = card ? "Edit card" : "New card";
+  $("mTitle").value = card ? card.title : "";
+  $("mPillar").value = card ? card.pillar : "Blended Family";
+  $("mSummary").value = card ? (card.summary||"") : "";
+  $("mScripture").value = card ? (card.scripture||"") : "";
+  $("mNotes").value = card ? (card.notes||"") : "";
+  $("mViews").value = card ? (card.views||"") : "";
+  $("mLikes").value = card ? (card.likes||"") : "";
+  $("mShares").value = card ? (card.shares||"") : "";
+  $("mFollowers").value = card ? (card.followers||"") : "";
+  seg($("mStatus"), COLS.map(c=>({k:c.k,label:c.label})), card ? card.status : "ideas");
+  seg($("mLang"), LANGS, card ? card.language : "BOTH");
+  $("mDelete").style.display = card ? "" : "none";
+  $("modal").classList.remove("hidden");
+}
+$("closeModal").onclick = () => $("modal").classList.add("hidden");
+$("modal").addEventListener("click", e => { if(e.target.id === "modal") $("modal").classList.add("hidden"); });
+$("addCardBtn").onclick = () => openModal(null);
+$("mSave").onclick = async () => {
+  const title = $("mTitle").value.trim();
+  if(!title){ toast("Give the card a title."); return; }
+  const num = v => { const n = parseInt(v,10); return isNaN(n) ? 0 : n; };
+  const payload = {
+    title,
+    status: segVal($("mStatus")) || "ideas",
+    language: segVal($("mLang")) || "BOTH",
+    pillar: $("mPillar").value.trim() || "Blended Family",
+    summary: $("mSummary").value.trim(),
+    scripture: $("mScripture").value.trim(),
+    notes: $("mNotes").value,
+    views: num($("mViews").value), likes: num($("mLikes").value),
+    shares: num($("mShares").value), followers: num($("mFollowers").value),
+    updated_at: new Date().toISOString(),
+  };
+  let error;
+  if(editingId){ ({error} = await sb.from("cc_cards").update(payload).eq("id", editingId)); }
+  else {
+    const maxPos = cards.reduce((m,c)=>Math.max(m,c.position||0),0);
+    ({error} = await sb.from("cc_cards").insert({...payload, position: maxPos+1}));
+  }
+  if(error) toast(error.message);
+  else { $("modal").classList.add("hidden"); toast("Saved."); loadBoard(); }
+};
+$("mDelete").onclick = async () => {
+  if(!editingId) return;
+  if(!confirm("Delete this card?")) return;
+  const {error} = await sb.from("cc_cards").delete().eq("id", editingId);
+  if(error) toast(error.message);
+  else { $("modal").classList.add("hidden"); toast("Deleted."); loadBoard(); }
+};
+
+/* ---------- huddle ---------- */
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+async function loadHuddle(){
+  const t = todayStr();
+  $("hDate").textContent = new Date().toLocaleDateString("en-US",{weekday:"long", month:"long", day:"numeric"});
+  const {data, error} = await sb.from("cc_huddle").select("*").eq("huddle_date", t).maybeSingle();
+  if(error){ toast("Could not load huddle."); return; }
+  const h = data || {};
+  $("hVerse").value = h.verse || ""; $("hPrayer").value = h.prayer_focus || "";
+  $("hIntention").value = h.intention || ""; $("hAlec").value = h.alec_note || "";
+  $("hStreak").value = (h.streak ?? "");
+  $("hStreakView").textContent = `🔥 ${(h.streak||0)} day streak`;
+}
+$("hSave").onclick = async () => {
+  const t = todayStr();
+  const num = v => { const n = parseInt(v,10); return isNaN(n) ? 0 : n; };
+  const payload = { huddle_date: t, verse: $("hVerse").value.trim(),
+    prayer_focus: $("hPrayer").value.trim(), intention: $("hIntention").value.trim(),
+    alec_note: $("hAlec").value.trim(), streak: num($("hStreak").value),
+    updated_at: new Date().toISOString() };
+  const {error} = await sb.from("cc_huddle").upsert(payload, {onConflict:"huddle_date"});
+  if(error) toast(error.message);
+  else { toast("Huddle saved."); $("hStreakView").textContent = `🔥 ${payload.streak} day streak`; }
+};
+
+/* ---------- tabs ---------- */
+$("tabBoard").onclick = () => {
+  $("tabBoard").classList.add("active"); $("tabToday").classList.remove("active");
+  $("boardWrap").classList.remove("hidden"); $("huddleWrap").classList.add("hidden");
+  $("addCardBtn").classList.remove("hidden");
+};
+$("tabToday").onclick = () => {
+  $("tabToday").classList.add("active"); $("tabBoard").classList.remove("active");
+  $("huddleWrap").classList.remove("hidden"); $("boardWrap").classList.add("hidden");
+  $("addCardBtn").classList.add("hidden");
+};
+
+/* ---------- boot ---------- */
+(async () => {
+  const {data} = await sb.auth.getSession();
+  if(data.session) enter();
+})();
+</script>
+</body>
+</html>
