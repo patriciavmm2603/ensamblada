@@ -126,6 +126,7 @@ nav.tabs button.active{color:var(--wine); background:#f3e9d8}
   <div id="authErr"></div>
   <button class="btn btn-wine" id="authGo">Sign in</button>
   <button class="btn-ghost" id="authToggle">New here? Create account</button>
+  <button class="btn-ghost" id="resendBtn" style="font-size:.82rem; opacity:.75">Didn't get the email? Resend it</button>
 </div>
 
 <!-- APP -->
@@ -240,6 +241,13 @@ $("authGo").onclick = async () => {
   $("authGo").disabled = false;
 };
 $("logoutBtn").onclick = async () => { await sb.auth.signOut(); location.reload(); };
+$("resendBtn").onclick = async () => {
+  const email = $("email").value.trim();
+  if(!email){ $("authErr").textContent = "Type your email first, then resend."; return; }
+  const {error} = await sb.auth.resend({type:"signup", email});
+  if(error) $("authErr").textContent = error.message;
+  else toast("Email resent. Check spam too.");
+};
 
 async function enter(){
   $("auth").classList.add("hidden");
