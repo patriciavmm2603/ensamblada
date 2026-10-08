@@ -196,6 +196,7 @@ nav.tabs button.active{color:var(--wine); background:#f3e9d8}
 const SUPABASE_URL = "https://nssdfhkzjoanbzgpilvz.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zc2RmaGt6am9hbmJ6Z3BpbHZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMzNDgyMDgsImV4cCI6MjA5ODkyNDIwOH0.noQB7SiltD400wftYPv309n5AX8sf5-Kp1ycNJS-0B8";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+const PUBLIC_MODE = true; // no login wall; re-lock by setting false + tightening RLS
 
 const COLS = [
   {k:"ideas", label:"Ideas"},
@@ -252,6 +253,7 @@ $("resendBtn").onclick = async () => {
 async function enter(){
   $("auth").classList.add("hidden");
   $("app").classList.remove("hidden");
+  if(PUBLIC_MODE){ $("logoutBtn").style.display = "none"; }
   await loadBoard();
   await loadHuddle();
 }
@@ -402,6 +404,7 @@ $("tabToday").onclick = () => {
 
 /* ---------- boot ---------- */
 (async () => {
+  if(PUBLIC_MODE){ enter(); return; }
   const {data} = await sb.auth.getSession();
   if(data.session) enter();
 })();
